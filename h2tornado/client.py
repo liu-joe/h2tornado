@@ -420,7 +420,7 @@ class H2Connection(object):
                 self.close("Graceful close called", reconnect=False)
                 return
 
-            sleep(5)
+            yield sleep(5)
     
     def close(self, reason, reconnect=True):
         """ Closes the connection, sending a GOAWAY frame. """
@@ -797,10 +797,10 @@ if __name__ == '__main__':
     
     @coroutine
     def doit():
-        for i in xrange(10):
-            IOLoop.current().add_callback(make_h2_conn)
-        yield sleep(3)
-        conn.close()
+        while True:
+            for i in xrange(10):
+                IOLoop.current().add_callback(make_h2_conn)
+            yield sleep(3)
 
     @coroutine
     def wait_for_connected(connected=None):
@@ -814,7 +814,7 @@ if __name__ == '__main__':
     
     def make_h2_conn():
         start = time.time()
-        result = conn.fetch(HTTPRequest('https://localhost:5000/',connect_timeout=10, request_timeout=10, client_key="key.pem", client_cert="cert.pem"))
+        result = conn.fetch(HTTPRequest('https://localhost:5000/',connect_timeout=5, request_timeout=5, client_key="key.pem", client_cert="cert.pem"))
         result.add_done_callback(partial(print_it, start))
 
     IOLoop.current().add_callback(doit)
