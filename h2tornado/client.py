@@ -153,6 +153,13 @@ class H2ConnectionPool(object):
         self.h2_connections = []
     
     def get_or_create_connection(self):
+        # Gracefully close any connections that have exhausted the number of streams
+        # allowed for a single connection. Remove them from our pool
+        no_more_available_streams = [c for c in self.h2_connections if not c.has_available_streams]
+        for done_conn in no_more_available_streams:
+            IOLoop.current().add_callback(done_conn.graceful_close)
+            self.h2_connections.remove(done_conn)
+
         ready_conns = [c for c in self.h2_connections if c.ready]
         if len(ready_conns) > 0:
             return random.choice(ready_conns)
@@ -223,26 +230,12 @@ class H2ConnectionPool(object):
                 done_future = connection.request(request)
                 done_future.add_done_callback(partial(chain_futures, request_future))
 
-    @coroutine
     def close(self, force=False):
-        if force:
-            for conn in self.h2_connections:
+        for conn in self.h2_connections:
+            if force:
                 conn.close("Close called", reconnect=False)
-        else:
-            while True:
-                conns_to_remove = []
-                for conn in self.h2_connections:
-                    if conn.drained:
-                        conn.close("Close called", reconnect=False)
-                        conns_to_remove.add(conn)
-
-                for conn in conns_to_remove:
-                    self.h2_connections.remove(conn)
-
-                if not self.h2_connections:
-                    return
-
-                yield sleep(30)
+            else:
+                IOLoop.current().add_callback(conn.graceful_close)
                 
 class H2Connection(object):
 
@@ -277,15 +270,25 @@ class H2Connection(object):
 
     @property
     def ready(self):
-        return self.is_connected and self.has_available_streams
+        return self.is_connected and self.has_outbound_capacity
 
+    @property
+    def has_outbound_capacity(self):
+        if not self.h2conn:
+            return True
+
+        has_outbound_capacity = self.h2conn.open_outbound_streams + 1 <= \
+            self.h2conn.remote_settings.max_concurrent_streams
+        return has_outbound_capacity
+    
     @property
     def has_available_streams(self):
         if not self.h2conn:
             return True
 
-        return self.h2conn.open_outbound_streams + 1 <= \
-            self.h2conn.remote_settings.max_concurrent_streams
+        has_available_stream_ids = self.h2conn.highest_outbound_stream_id is None or \
+            self.h2conn.highest_outbound_stream_id + 2 <= self.h2conn.HIGHEST_ALLOWED_STREAM_ID
+        return has_available_stream_ids
 
     @property
     def is_connected(self):
@@ -400,6 +403,18 @@ class H2Connection(object):
 
         cancelled.cancel()
         self.close(err)
+
+    @coroutine
+    def graceful_close(self):
+        while True:
+            if self._closed:
+                return
+            
+            if self.drained:
+                self.close("Graceful close called", reconnect=False)
+                return
+
+            sleep(5)
     
     def close(self, reason, reconnect=True):
         """ Closes the connection, sending a GOAWAY frame. """
