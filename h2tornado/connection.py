@@ -65,7 +65,7 @@ class H2Connection(object):
         if not self.h2conn:
             return True
 
-        has_outbound_capacity = self.h2conn.open_outbound_streams + 1 <= \
+        has_outbound_capacity = len(self._streams) + 1 <= \
             self.h2conn.remote_settings.max_concurrent_streams
         return has_outbound_capacity
 
