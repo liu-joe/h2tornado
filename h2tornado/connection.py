@@ -16,7 +16,7 @@ from tornado.gen import coroutine
 from tornado.ioloop import IOLoop
 from tornado.tcpclient import TCPClient
 
-from h2tornado.config import ALPN_PROTOCOLS
+from h2tornado.config import ALPN_PROTOCOLS, DEFAULT_WINDOW_SIZE
 from h2tornado.exceptions import ConnectionError
 from h2tornado.stream import H2Stream
 from h2tornado.utils import CancelContext
@@ -45,8 +45,7 @@ class H2Connection(object):
 
         self.parse_ssl_opts()
 
-        # TODO: config options
-        self.initial_window_size = 65536
+        self.initial_window_size = DEFAULT_WINDOW_SIZE
         self.max_backoff_seconds = 60
         self.consecutive_connect_fails = 0
         self.max_concurrent_streams = 1
