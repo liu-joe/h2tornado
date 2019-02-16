@@ -12,9 +12,16 @@ from h2tornado.connection import H2Connection
 
 logger = logging.getLogger('h2tornado.pool')
 
+
 class H2ConnectionPool(object):
-    
-    def __init__(self, host, port, ssl_options, max_connections=5, connect_timeout=5):
+
+    def __init__(
+            self,
+            host,
+            port,
+            ssl_options,
+            max_connections=5,
+            connect_timeout=5):
         self.host = host
         self.port = port
         self.ssl_options = ssl_options
@@ -30,11 +37,12 @@ class H2ConnectionPool(object):
         self.waiters = {}
 
         self.h2_connections = []
-    
+
     def get_or_create_connection(self):
         # Gracefully close any connections that have exhausted the number of streams
         # allowed for a single connection. Remove them from our pool
-        no_more_available_streams = [c for c in self.h2_connections if not c.has_available_streams]
+        no_more_available_streams = [
+            c for c in self.h2_connections if not c.has_available_streams]
         for done_conn in no_more_available_streams:
             IOLoop.current().add_callback(done_conn.graceful_close)
             self.h2_connections.remove(done_conn)
@@ -42,11 +50,12 @@ class H2ConnectionPool(object):
         ready_conns = [c for c in self.h2_connections if c.ready]
         if len(ready_conns) > 0:
             return random.choice(ready_conns)
-        
+
         # None of the connections were ready, check to see if any
         # are not connected, if so, we can wait for one of them
         # to connect
-        connecting_conns = [c for c in self.h2_connections if not c.is_connected]
+        connecting_conns = [
+            c for c in self.h2_connections if not c.is_connected]
 
         # If there are none, then that means we have reached the maximum outbound
         # streams (or there are no connections). Make a new connection as long as
@@ -65,9 +74,14 @@ class H2ConnectionPool(object):
         timeout_handle, request, future = self.waiters[key]
         self.queue.remove((key, request, future,))
         future.set_result(
-            HTTPResponse(request, 599, error=HTTPError(599, "Timed out in queue"),
-                request_time=IOLoop.current().time() - request.start_time)
-        )
+            HTTPResponse(
+                request,
+                599,
+                error=HTTPError(
+                    599,
+                    "Timed out in queue"),
+                request_time=IOLoop.current().time() -
+                request.start_time))
         del self.waiters[key]
 
     def request(self, request):
@@ -75,9 +89,9 @@ class H2ConnectionPool(object):
         key = object()
         self.queue.append((key, request, future))
         if not self.get_or_create_connection():
-            timeout_handle = IOLoop.current().add_timeout(IOLoop.current().time() + \
-                min(request.connect_timeout, request.request_timeout),
-                partial(self._on_timeout, key))
+            timeout_handle = IOLoop.current().add_timeout(IOLoop.current().time() +
+                                                          min(request.connect_timeout, request.request_timeout),
+                                                          partial(self._on_timeout, key))
         else:
             timeout_handle = None
         self.waiters[key] = (timeout_handle, request, future)
@@ -99,6 +113,7 @@ class H2ConnectionPool(object):
                 if key not in self.waiters:
                     continue
                 self._remove_timeout(key)
+
                 def chain_futures(req_future, f):
                     if f.exception():
                         req_future.set_exception(f.exception())
@@ -107,7 +122,8 @@ class H2ConnectionPool(object):
                     IOLoop.current().add_callback(self._process_queue)
 
                 done_future = connection.request(request)
-                done_future.add_done_callback(partial(chain_futures, request_future))
+                done_future.add_done_callback(
+                    partial(chain_futures, request_future))
 
     def close(self, force=False):
         for conn in self.h2_connections:
@@ -115,4 +131,3 @@ class H2ConnectionPool(object):
                 conn.close("Close called", reconnect=False)
             else:
                 IOLoop.current().add_callback(conn.graceful_close)
-                

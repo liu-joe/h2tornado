@@ -12,6 +12,7 @@ from h2tornado.pool import H2ConnectionPool
 
 logger = logging.getLogger('h2tornado')
 
+
 class AsyncHTTP2Client(object):
     def __init__(self, default_max_connections=5):
         self.default_max_connections = default_max_connections
@@ -21,12 +22,12 @@ class AsyncHTTP2Client(object):
     # Optional method to pre-add a connection pool, otherwise they will
     # be created on demand using the information from the http request
     def add_connection_pool(self, host, port, ssl_options, max_connections=5,
-            connect_timeout=5):
+                            connect_timeout=5):
         key = (host, port,)
         if key in self.pools:
             pool = self.pools[key]
             IOLoop.current().add_callback(pool.close)
-        
+
         self.pools[key] = H2ConnectionPool(
             host, port, ssl_options, max_connections, connect_timeout
         )
@@ -38,11 +39,13 @@ class AsyncHTTP2Client(object):
             request = HTTPRequest(url=request, **kwargs)
         else:
             if kwargs:
-                raise ValueError("kwargs can't be used if request is an HTTPRequest object")
+                raise ValueError(
+                    "kwargs can't be used if request is an HTTPRequest object")
         request.headers = httputil.HTTPHeaders(request.headers)
         future = Future()
         if callback is not None:
             callback = stack_context.wrap(callback)
+
             def handle_future(future):
                 exc = future.exception()
                 if isinstance(exc, HTTPError) and exc.response is not None:
@@ -55,7 +58,7 @@ class AsyncHTTP2Client(object):
                     response = future.result()
                 IOLoop.current().add_callback(partial(callback, response))
             future.add_done_callback(handle_future)
-        
+
         def handle_response(f):
             response = f.result()
             if raise_error and response.error:
@@ -75,18 +78,17 @@ class AsyncHTTP2Client(object):
                 ssl_options = request.ssl_options
             else:
                 ssl_options = {
-                    'validate_cert' : request.validate_cert,
-                    'ca_certs' : request.ca_certs,
-                    'client_key' : request.client_key,
-                    'client_cert' : request.client_cert,
+                    'validate_cert': request.validate_cert,
+                    'ca_certs': request.ca_certs,
+                    'client_key': request.client_key,
+                    'client_cert': request.client_cert,
                 }
             self.pools[key] = H2ConnectionPool(
-                host, port, ssl_options, max_connections=self.default_max_connections
-            )
+                host, port, ssl_options, max_connections=self.default_max_connections)
 
         pool = self.pools[key]
         pool.request(request).add_done_callback(handle_response)
-    
+
     def _parse_host_port(self, url):
         parsed = urlparse(url)
         port = parsed.port if parsed.port else 443
@@ -103,6 +105,7 @@ class AsyncHTTP2Client(object):
                 partial(pool.close, force=force)
             )
 
+
 class HTTP2Client(object):
     def __init__(self, *args, **kwargs):
         self._client = AsyncHTTP2Client(*args, **kwargs)
@@ -110,7 +113,7 @@ class HTTP2Client(object):
 
     def fetch(self, *args, **kwargs):
         return IOLoop.current().run_sync(partial(self._client.fetch, *args, **kwargs))
-    
+
     def close(self):
         if self._closed:
             return
@@ -118,16 +121,23 @@ class HTTP2Client(object):
         self._closed = True
         self._client.close()
 
+
 if __name__ == '__main__':
-    print HTTP2Client().fetch(HTTPRequest('https://localhost:5000/',connect_timeout=5, request_timeout=5, client_key="key.pem", client_cert="cert.pem"))
+    print HTTP2Client().fetch(
+        HTTPRequest(
+            'https://localhost:5000/',
+            connect_timeout=5,
+            request_timeout=5,
+            client_key="key.pem",
+            client_cert="cert.pem"))
     import time
     from tornado.gen import sleep
 
     def print_it(start, res):
         print res.result(), time.time() - start
 
-    conn =AsyncHTTP2Client()
-    
+    conn = AsyncHTTP2Client()
+
     @coroutine
     def doit():
         while True:
@@ -144,10 +154,15 @@ if __name__ == '__main__':
         else:
             make_h2_conn()
 
-    
     def make_h2_conn():
         start = time.time()
-        result = conn.fetch(HTTPRequest('https://localhost:5000/',connect_timeout=5, request_timeout=5, client_key="key.pem", client_cert="cert.pem"))
+        result = conn.fetch(
+            HTTPRequest(
+                'https://localhost:5000/',
+                connect_timeout=5,
+                request_timeout=5,
+                client_key="key.pem",
+                client_cert="cert.pem"))
         result.add_done_callback(partial(print_it, start))
 
     IOLoop.current().add_callback(doit)

@@ -7,4 +7,3 @@ class CancelContext(object):
 
     def cancel(self):
         self.cancelled = True
-

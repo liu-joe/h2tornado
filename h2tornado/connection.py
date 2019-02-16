@@ -24,12 +24,13 @@ from h2tornado.utils import CancelContext
 
 logger = logging.getLogger('h2tornado.connection')
 
+
 class H2Connection(object):
 
     def __init__(self, host, port, ssl_options):
         self.host = host
         self.port = port
-        
+
         self.tcp_client = TCPClient()
 
         self.h2conn = None
@@ -42,7 +43,7 @@ class H2Connection(object):
         self._streams = {}
         self.ssl_context = None
         self.ssl_options = ssl_options
-        
+
         self.parse_ssl_opts()
 
         # TODO: config options
@@ -69,7 +70,7 @@ class H2Connection(object):
         has_outbound_capacity = self.h2conn.open_outbound_streams + 1 <= \
             self.h2conn.remote_settings.max_concurrent_streams
         return has_outbound_capacity
-    
+
     @property
     def has_available_streams(self):
         if not self.h2conn:
@@ -87,6 +88,7 @@ class H2Connection(object):
 
     def request(self, request):
         future = Future()
+
         def callback(result):
             if isinstance(result, Exception):
                 future.set_exception(result)
@@ -119,7 +121,8 @@ class H2Connection(object):
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
 
-        if self.ssl_options.get('client_key') or self.ssl_options.get('client_cert'):
+        if self.ssl_options.get(
+                'client_key') or self.ssl_options.get('client_cert'):
             ssl_context.load_cert_chain(
                 self.ssl_options.get('client_cert'),
                 keyfile=self.ssl_options.get('client_key')
@@ -129,18 +132,18 @@ class H2Connection(object):
         ssl_context.set_alpn_protocols(ALPN_PROTOCOLS)
 
         self.ssl_context = ssl_context
-    
+
     def connect(self):
         if self._connect_timeout_handle:
             return
-        
+
         self._connect_future = Future()
         # Shared context to cleanly cancel inflight operations
         cancelled = CancelContext()
         start_time = IOLoop.current().time()
         self._connect_timeout_handle = IOLoop.current().add_timeout(
             start_time + self.connect_timeout, partial(self.on_connect_timeout, cancelled))
-        
+
         def _on_tcp_client_connected(f):
             exc = f.exc_info()
             if exc is not None:
@@ -158,11 +161,11 @@ class H2Connection(object):
         )
         ft.add_done_callback(_on_tcp_client_connected)
         return self._connect_future
-    
+
     def _backoff_reconnect(self):
         IOLoop.current().add_timeout(
-            IOLoop.current().time() + \
-                min(self.max_backoff_seconds, self.consecutive_connect_fails**1.5),
+            IOLoop.current().time() +
+            min(self.max_backoff_seconds, self.consecutive_connect_fails**1.5),
             self.connect)
 
     def on_connect_timeout(self, cancelled):
@@ -171,7 +174,7 @@ class H2Connection(object):
         cancelled.cancel()
         exc = ConnectionError('Connection could not be established in time!')
         self.close(exc)
-    
+
     def on_error(self, phase, cancelled, typ, val, tb):
         """
         Connection error.
@@ -187,7 +190,7 @@ class H2Connection(object):
         # Already closed, so no cleanup needed
         if cancelled():
             return
-        
+
         err = None
         if self.io_stream:
             err = self.io_stream.error
@@ -204,14 +207,14 @@ class H2Connection(object):
         while True:
             if self._closed:
                 return
-            
+
             if self.drained:
                 self.close("Graceful close called", reconnect=False)
                 return
 
             yield sleep(min(max_backoff, i**1.5))
             i += 1
-    
+
     def close(self, reason, reconnect=True):
         """ Closes the connection, sending a GOAWAY frame. """
         logger.debug('Closing HTTP2Connection with reason %s', reason)
@@ -259,13 +262,14 @@ class H2Connection(object):
 
             self.consecutive_connect_fails = 0
             if io_stream.socket.selected_alpn_protocol() not in ALPN_PROTOCOLS:
-                log.error(
+                logging.error(
                     'Negotiated protocols mismatch, got %s, expected one of %s',
                     io_stream.socket.selected_alpn_protocol(),
-                    ALPN_PROTOCOLS
-                )
-                raise ConnectionError('Negotiated protocols mismatch, got %s but not in supported protos %s',
-                    io_stream.socket.selected_alpn_protocol(), ALPN_PROTOCOLS)
+                    ALPN_PROTOCOLS)
+                raise ConnectionError(
+                    'Negotiated protocols mismatch, got %s but not in supported protos %s',
+                    io_stream.socket.selected_alpn_protocol(),
+                    ALPN_PROTOCOLS)
 
             # remove the connection timeout
             IOLoop.current().remove_timeout(self._connect_timeout_handle)
@@ -308,10 +312,11 @@ class H2Connection(object):
                 ):
                     self.io_stream.read_bytes(
                         num_bytes=65535,
-                        streaming_callback=partial(self.receive_data_until_cancelled, cancelled),
-                        callback=read_until_cancelled
-                    )
-            
+                        streaming_callback=partial(
+                            self.receive_data_until_cancelled,
+                            cancelled),
+                        callback=read_until_cancelled)
+
             read_until_cancelled()
             self.flush()
         except Exception as e:
@@ -355,15 +360,16 @@ class H2Connection(object):
                         error_string = "Connection closed by remote end"
                         if event.error_code != 0:
                             try:
-                                name, number, description = get_data_errors(event.error_code)
+                                name, number, description = get_data_errors(
+                                    event.error_code)
                             except ValueError:
                                 error_string = (
-                                    "Encountered error code %d" % event.error_code
-                                )
+                                    "Encountered error code %d" %
+                                    event.error_code)
                             else:
                                 error_string = (
-                                    "Encountered error %s %s: %s" % \
-                                     (name, number, description)
+                                    "Encountered error %s %s: %s" %
+                                    (name, number, description)
                                 )
                         self.close(ConnectionError(error_string))
                     else:
@@ -372,7 +378,8 @@ class H2Connection(object):
                     logger.exception("Error while handling event %s", event)
             self.flush()
         except Exception:
-            logger.exception("Exception while receiving data from %s", (self.host, self.port,))
+            logger.exception(
+                "Exception while receiving data from %s", (self.host, self.port,))
 
     def flush(self):
         future = Future()
@@ -392,4 +399,3 @@ class H2Connection(object):
             # for example, when any individual stream could call this
             future.set_result(None)
         return future
-

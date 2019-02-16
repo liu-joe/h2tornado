@@ -22,9 +22,10 @@ from h2tornado.config import DEFAULT_WINDOW_SIZE
 
 logger = logging.getLogger('h2tornado.stream')
 
+
 class H2Stream(object):
     def __init__(self, request, stream_id, h2conn, callback_response,
-            send_outstanding_data_cb, close_cb):
+                 send_outstanding_data_cb, close_cb):
         self.stream_id = stream_id
         self.h2conn = h2conn
         self.callback_response = callback_response
@@ -34,7 +35,7 @@ class H2Stream(object):
         self.data = []
         self.remote_closed = False
         self.local_closed = False
-        
+
         self.request = request
         self.flow_control_manager = FlowControlManager(DEFAULT_WINDOW_SIZE)
 
@@ -58,7 +59,8 @@ class H2Stream(object):
             if not parsed.netloc:
                 self.request.headers['Host'] = self.connection.host
             elif '@' in parsed.netloc:
-                self.request.headers['Host'] = parsed.netloc.rpartition('@')[-1]
+                self.request.headers['Host'] = parsed.netloc.rpartition(
+                    '@')[-1]
             else:
                 self.request.headers['Host'] = parsed.netloc
 
@@ -66,7 +68,8 @@ class H2Stream(object):
             self.request.headers['User-Agent'] = self.request.user_agent
 
         if self.request.body is not None:
-            self.request.headers['Content-Length'] = str(len(self.request.body))
+            self.request.headers['Content-Length'] = str(
+                len(self.request.body))
 
         if (
             self.request.method == 'POST'
@@ -137,7 +140,7 @@ class H2Stream(object):
                 try:
                     self.h2conn.increment_flow_control_window(
                         increment, stream_id=self.stream_id
-                    )   
+                    )
                 except h2.exceptions.StreamClosedError:
                     pass
                 else:
@@ -153,7 +156,10 @@ class H2Stream(object):
             self.remote_closed = True
             self.finish(exc=StreamResetException("Stream reset"))
         else:
-            logger.info("Got unhandled event on stream %s: %s", self.stream_id, event)
+            logger.info(
+                "Got unhandled event on stream %s: %s",
+                self.stream_id,
+                event)
 
     def _on_timeout(self):
         IOLoop.current().remove_timeout(self._timeout_handle)
@@ -169,7 +175,7 @@ class H2Stream(object):
     def finish(self, exc=None, timed_out=False):
         if self._finished:
             return
-        
+
         self._finished = True
         if self._timeout_handle:
             IOLoop.current().remove_timeout(self._timeout_handle)
@@ -203,5 +209,4 @@ class H2Stream(object):
             )
 
         self.close_cb(stream_id=self.stream_id)
-        self.callback_response(response) 
-
+        self.callback_response(response)
