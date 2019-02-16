@@ -412,6 +412,8 @@ class H2Connection(object):
 
     @coroutine
     def graceful_close(self):
+        max_backoff = 30
+        i = 0
         while True:
             if self._closed:
                 return
@@ -420,7 +422,8 @@ class H2Connection(object):
                 self.close("Graceful close called", reconnect=False)
                 return
 
-            yield sleep(5)
+            yield sleep(min(max_backoff, i**1.5))
+            i += 1
     
     def close(self, reason, reconnect=True):
         """ Closes the connection, sending a GOAWAY frame. """
