@@ -748,7 +748,7 @@ class H2Stream(object):
             response = exc
         else:
             # compose the body
-            headers = None
+            headers = {}
             if not timed_out:
                 data = io.BytesIO(b''.join(self.data))
                 headers = {}
