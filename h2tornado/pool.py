@@ -1,12 +1,12 @@
 import collections
 import logging
 import random
+from functools import partial
 
 from tornado import stack_context
 from tornado.concurrent import Future
 from tornado.httpclient import HTTPError, HTTPResponse
 from tornado.ioloop import IOLoop
-from functools import partial
 
 from h2tornado.connection import H2Connection
 

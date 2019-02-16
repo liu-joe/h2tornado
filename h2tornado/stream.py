@@ -1,6 +1,8 @@
-import logging
 import httplib
 import io
+import logging
+from functools import partial
+from urlparse import urlsplit
 
 import h2.config
 import h2.connection
@@ -8,17 +10,14 @@ import h2.errors
 import h2.events
 import h2.exceptions
 import h2.settings
-
+from hyper.http20.window import FlowControlManager
 from tornado import httputil
+from tornado.escape import to_unicode
 from tornado.httpclient import HTTPResponse
 from tornado.ioloop import IOLoop
-from functools import partial
-from urlparse import urlsplit
-from tornado.escape import to_unicode
-from hyper.http20.window import FlowControlManager
 
-from h2tornado.exceptions import StreamResetException
 from h2tornado.config import DEFAULT_WINDOW_SIZE
+from h2tornado.exceptions import StreamResetException
 
 logger = logging.getLogger('h2tornado.stream')
 

@@ -1,11 +1,11 @@
 import logging
-
-from tornado import stack_context, httputil
-from tornado.concurrent import Future
-from tornado.httpclient import HTTPRequest, HTTPResponse, HTTPError
-from tornado.ioloop import IOLoop
 from functools import partial
 from urlparse import urlparse
+
+from tornado import httputil, stack_context
+from tornado.concurrent import Future
+from tornado.httpclient import HTTPError, HTTPRequest, HTTPResponse
+from tornado.ioloop import IOLoop
 
 from h2tornado.pool import H2ConnectionPool
 

@@ -1,6 +1,7 @@
 import logging
-import ssl
 import socket
+import ssl
+from functools import partial
 
 import h2.config
 import h2.connection
@@ -8,18 +9,16 @@ import h2.errors
 import h2.events
 import h2.exceptions
 import h2.settings
-
+from hyper.http20.window import FlowControlManager
 from tornado import stack_context
 from tornado.concurrent import Future
+from tornado.gen import coroutine
 from tornado.ioloop import IOLoop
 from tornado.tcpclient import TCPClient
-from tornado.gen import coroutine
-from functools import partial
-from hyper.http20.window import FlowControlManager
 
+from h2tornado.config import ALPN_PROTOCOLS
 from h2tornado.exceptions import ConnectionError
 from h2tornado.stream import H2Stream
-from h2tornado.config import ALPN_PROTOCOLS
 from h2tornado.utils import CancelContext
 
 logger = logging.getLogger('h2tornado.connection')
