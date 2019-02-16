@@ -20,7 +20,7 @@ from tornado.ioloop import IOLoop
 from tornado.tcpclient import TCPClient
 from tornado.gen import coroutine, Return
 from functools import partial
-from urlparse import urlsplit
+from urlparse import urlsplit, urlparse
 from tornado.escape import to_unicode
 from hyper.http20.window import FlowControlManager
 from hyper.http20.errors import get_data as get_error_data
@@ -43,14 +43,103 @@ ALPN_PROTOCOLS = ['h2']
 DEFAULT_WINDOW_SIZE = 65536
 
 class AsyncHTTP2Client(object):
-    pass
+    def __init__(self, default_max_connections=5):
+        self.default_max_connections = default_max_connections
+        self.pools = {}
+        self._closed = False
+
+    # Optional method to pre-add a connection pool, otherwise they will
+    # be created on demand using the information from the http request
+    def add_connection_pool(self, host, port, ssl_options, max_connections=5,
+            connect_timeout=5):
+        key = (host, port,)
+        if key in self.pools:
+            pool = self.pools[key]
+            IOLoop.current().add_callback(pool.close)
+        
+        self.pools[key] = H2ConnectionPool(
+            host, port, ssl_options, max_connections, connect_timeout
+        )
+
+    def fetch(self, request, callback=None, raise_error=True, **kwargs):
+        if self._closed:
+            raise RuntimeError("fetch() called on a closed AsyncHTTP2Client")
+        if not isinstance(request, HTTPRequest):
+            request = HTTPRequest(url=request, **kwargs)
+        else:
+            if kwargs:
+                raise ValueError("kwargs can't be used if request is an HTTPRequest object")
+        request.headers = httputil.HTTPHeaders(request.headers)
+        future = Future()
+        if callback is not None:
+            callback = stack_context.wrap(callback)
+            def handle_future(future):
+                exc = future.exception()
+                if isinstance(exc, HTTPError) and exc.response is not None:
+                    response = exc.response
+                elif exc is not None:
+                    response = HTTPResponse(
+                        request, 599, error=exc,
+                        request_time=time.time() - request.start_time)
+                else:
+                    response = future.result()
+                IOLoop.current().add_callback(partial(callback, response))
+            future.add_done_callback(handle_future)
+        
+        def handle_response(f):
+            response = f.result()
+            if raise_error and response.error:
+                if isinstance(response.error, HTTPError):
+                    response.error.response = response
+                future.set_exception(response.error)
+            else:
+                future.set_result(response)
+        self.fetch_impl(request, handle_response)
+        return future
+
+    def fetch_impl(self, request, handle_response):
+        key = self._parse_host_port(request.url)
+        host, port = key
+        if key not in self.pools:
+            if request.ssl_options:
+                ssl_options = request.ssl_options
+            else:
+                ssl_options = {
+                    'validate_cert' : request.validate_cert,
+                    'ca_certs' : request.ca_certs,
+                    'client_key' : request.client_key,
+                    'client_cert' : request.client_cert,
+                }
+            self.pools[key] = H2ConnectionPool(
+                host, port, ssl_options, max_connections=self.default_max_connections
+            )
+
+        pool = self.pools[key]
+        pool.request(request).add_done_callback(handle_response)
+    
+    def _parse_host_port(self, url):
+        parsed = urlparse(url)
+        port = parsed.port if parsed.port else 443
+        host = parsed.hostname
+        return (host, port,)
+
+    def close(self, force=True):
+        if self._closed:
+            return
+
+        self._closed = True
+        for _, pool in self.pools.iteritems():
+            IOLoop.current().add_callback(
+                partial(pool.close, force=force)
+            )
 
 class H2ConnectionPool(object):
     
-    def __init__(self, host, port, ssl_options, max_connections=5):
+    def __init__(self, host, port, ssl_options, max_connections=5, connect_timeout=5):
         self.host = host
         self.port = port
         self.ssl_options = ssl_options
+        self.connect_timeout = connect_timeout
 
         # Maximum number of http2 connections to open (in the case of
         # us queueing requests due to maxing out the number of outbound
@@ -133,6 +222,27 @@ class H2ConnectionPool(object):
 
                 done_future = connection.request(request)
                 done_future.add_done_callback(partial(chain_futures, request_future))
+
+    @coroutine
+    def close(self, force=False):
+        if force:
+            for conn in self.h2_connections:
+                conn.close("Close called", reconnect=False)
+        else:
+            while True:
+                conns_to_remove = []
+                for conn in self.h2_connections:
+                    if conn.drained:
+                        conn.close("Close called", reconnect=False)
+                        conns_to_remove.add(conn)
+
+                for conn in conns_to_remove:
+                    self.h2_connections.remove(conn)
+
+                if not self.h2_connections:
+                    return
+
+                yield sleep(30)
                 
 class H2Connection(object):
 
@@ -160,6 +270,10 @@ class H2Connection(object):
         self.max_backoff_seconds = 60
         self.consecutive_connect_fails = 0
         self.max_concurrent_streams = 1
+
+    @property
+    def drained(self):
+        return len(self._streams) <= 0
 
     @property
     def ready(self):
@@ -287,7 +401,7 @@ class H2Connection(object):
         cancelled.cancel()
         self.close(err)
     
-    def close(self, reason):
+    def close(self, reason, reconnect=True):
         """ Closes the connection, sending a GOAWAY frame. """
         logger.debug('Closing HTTP2Connection with reason %s', reason)
 
@@ -317,7 +431,8 @@ class H2Connection(object):
 
         self.window_manager = None
         self.end_all_streams(reason)
-        self._backoff_reconnect()
+        if reconnect:
+            self._backoff_reconnect()
 
     def end_all_streams(self, exc=None):
         for _, stream in self._streams.iteritems():
@@ -651,12 +766,12 @@ if __name__ == '__main__':
     def print_it(start, res):
         print res.result(), time.time() - start
 
-    conn = H2ConnectionPool('localhost',5000, {})
+    conn =AsyncHTTP2Client()
     
     @coroutine
     def doit():
         while True:
-            for i in xrange(1000):
+            for i in xrange(500):
                 IOLoop.current().add_callback(make_h2_conn)
             yield sleep(1)
 
@@ -672,7 +787,7 @@ if __name__ == '__main__':
     
     def make_h2_conn():
         start = time.time()
-        result = conn.request(HTTPRequest('https://localhost:5000/',connect_timeout=10, request_timeout=10))
+        result = conn.fetch(HTTPRequest('https://localhost:5000/',connect_timeout=10, request_timeout=10))
         result.add_done_callback(partial(print_it, start))
 
     IOLoop.current().add_callback(doit)
