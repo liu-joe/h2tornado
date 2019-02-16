@@ -264,6 +264,8 @@ class H2Connection(object):
         self.consecutive_connect_fails = 0
         self.max_concurrent_streams = 1
 
+        self._closed = False
+
     @property
     def drained(self):
         return len(self._streams) <= 0
@@ -394,12 +396,11 @@ class H2Connection(object):
         if cancelled():
             return
         
-        err = self.io_stream.error
+        err = None
+        if self.io_stream:
+            err = self.io_stream.error
         if not err:
             err = ConnectionError("Error closed by remote end")
-
-        # No need to clean up the iostream as its closed
-        self.io_stream = None
 
         cancelled.cancel()
         self.close(err)
@@ -429,7 +430,7 @@ class H2Connection(object):
                 self.h2conn.close_connection()
                 self.flush()
             except Exception:
-                log.error(
+                logging.error(
                     'Could not send GOAWAY frame, connection terminated!',
                     exc_info=True
                 )
@@ -440,7 +441,7 @@ class H2Connection(object):
             try:
                 self.io_stream.close()
             except Exception:
-                log.error('Could not close IOStream!', exc_info=True)
+                logging.error('Could not close IOStream!', exc_info=True)
             finally:
                 self.io_stream = None
 
@@ -448,6 +449,8 @@ class H2Connection(object):
         self.end_all_streams(reason)
         if reconnect:
             self._backoff_reconnect()
+        else:
+            self._closed = True
 
     def end_all_streams(self, exc=None):
         for _, stream in self._streams.iteritems():
@@ -577,8 +580,12 @@ class H2Connection(object):
             logger.exception("Exception while receiving data from %s", (self.host, self.port,))
 
     def flush(self):
-        data_to_send = self.h2conn.data_to_send()
         future = Future()
+        if self._closed:
+            future.set_result(None)
+            return future
+
+        data_to_send = self.h2conn.data_to_send()
         if data_to_send:
             try:
                 future = self.io_stream.write(data_to_send)
@@ -785,10 +792,10 @@ if __name__ == '__main__':
     
     @coroutine
     def doit():
-        while True:
-            for i in xrange(500):
-                IOLoop.current().add_callback(make_h2_conn)
-            yield sleep(1)
+        for i in xrange(10):
+            IOLoop.current().add_callback(make_h2_conn)
+        yield sleep(3)
+        conn.close()
 
     @coroutine
     def wait_for_connected(connected=None):
