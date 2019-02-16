@@ -254,7 +254,7 @@ class H2Connection(object):
 
         self._streams = {}
         self.ssl_context = None
-        self.ssl_options = {}
+        self.ssl_options = ssl_options
         
         self.parse_ssl_opts()
 
@@ -318,12 +318,17 @@ class H2Connection(object):
         del self._streams[stream_id]
 
     def parse_ssl_opts(self):
-        ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        if isinstance(self.ssl_options, ssl.SSLContext):
+            self.ssl_context = ssl_options
+            return
+
+        ssl_context = ssl.create_default_context(
+            ssl.Purpose.SERVER_AUTH, cafile=self.ssl_options.get('ca_certs')
+        )
         ssl_context.options |= ssl.OP_NO_TLSv1
         ssl_context.options |= ssl.OP_NO_TLSv1_1
 
-        # TODO> dont bypass this
-        if True or not self.ssl_options.get('verify_certificate', True):
+        if not self.ssl_options.get('validate_cert', True):
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
 
@@ -809,7 +814,7 @@ if __name__ == '__main__':
     
     def make_h2_conn():
         start = time.time()
-        result = conn.fetch(HTTPRequest('https://localhost:5000/',connect_timeout=10, request_timeout=10))
+        result = conn.fetch(HTTPRequest('https://localhost:5000/',connect_timeout=10, request_timeout=10, client_key="key.pem", client_cert="cert.pem"))
         result.add_done_callback(partial(print_it, start))
 
     IOLoop.current().add_callback(doit)
