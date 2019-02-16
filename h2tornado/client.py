@@ -119,3 +119,4 @@ class HTTP2Client(object):
 
         self._closed = True
         self._client.close()
+

@@ -250,7 +250,7 @@ class H2Connection(object):
 
     def end_all_streams(self, exc=None):
         for _, stream in self._streams.iteritems():
-            stream.finish(exc)
+            IOLoop.current().add_callback(partial(stream.finish, exc))
 
     def on_connect(self, cancelled, io_stream):
         try:
@@ -375,6 +375,10 @@ class H2Connection(object):
                 except Exception:
                     logger.exception("Error while handling event %s", event)
             self.flush()
+        except h2.exceptions.StreamClosedError:
+            logger.info("Got stream closed on connection, reconnecting...")
+            cancelled.cancel()
+            self.close(ConnectionError("Stream closed by remote peer"))
         except Exception:
             logger.exception(
                 "Exception while receiving data from %s", (self.host, self.port,))

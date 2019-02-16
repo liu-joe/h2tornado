@@ -180,32 +180,33 @@ class H2Stream(object):
             IOLoop.current().remove_timeout(self._timeout_handle)
             self._timeout_handle = None
 
+        headers = {}
+        data = io.BytesIO()
+        # Stream reset
         if exc:
-            response = exc
-        else:
-            # compose the body
+            code = 500
+            reason = exc.message if hasattr(exc,"message") else str(exc)
+        elif not timed_out:
+            data = io.BytesIO(b''.join(self.data))
             headers = {}
-            if not timed_out:
-                data = io.BytesIO(b''.join(self.data))
-                headers = {}
-                for header, value in self.response_headers:
-                    headers[header] = value
-                code = int(headers.pop(':status'))
-                reason = httplib.responses.get(code, 'Unknown')
-            else:
-                data = io.BytesIO()
-                code = 599
-                reason = "CLIENT_SIDE_TIMEOUT"
+            for header, value in self.response_headers:
+                headers[header] = value
+            code = int(headers.pop(':status'))
+            reason = httplib.responses.get(code, 'Unknown')
+        else:
+            code = 599
+            reason = "CLIENT_SIDE_TIMEOUT"
 
-            response = HTTPResponse(
-                self.request,
-                code,
-                reason=reason,
-                headers=httputil.HTTPHeaders(headers),
-                buffer=data,
-                request_time=IOLoop.current().time() - self.request.start_time,
-                effective_url=self.request.url
-            )
+        response = HTTPResponse(
+            self.request,
+            code,
+            reason=reason,
+            headers=httputil.HTTPHeaders(headers),
+            buffer=data,
+            request_time=IOLoop.current().time() - self.request.start_time,
+            effective_url=self.request.url
+        )
+        response.request.response = response
 
         self.close_cb(stream_id=self.stream_id)
         self.callback_response(response)
