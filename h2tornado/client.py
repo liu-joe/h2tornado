@@ -103,7 +103,23 @@ class AsyncHTTP2Client(object):
                 partial(pool.close, force=force)
             )
 
+class HTTP2Client(object):
+    def __init__(self, *args, **kwargs):
+        self._client = AsyncHTTP2Client(*args, **kwargs)
+        self._closed = False
+
+    def fetch(self, *args, **kwargs):
+        return IOLoop.current().run_sync(partial(self._client.fetch, *args, **kwargs))
+    
+    def close(self):
+        if self._closed:
+            return
+
+        self._closed = True
+        self._client.close()
+
 if __name__ == '__main__':
+    print HTTP2Client().fetch(HTTPRequest('https://localhost:5000/',connect_timeout=5, request_timeout=5, client_key="key.pem", client_cert="cert.pem"))
     import time
     from tornado.gen import sleep
 
