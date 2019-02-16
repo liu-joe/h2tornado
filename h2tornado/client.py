@@ -25,7 +25,7 @@ class AsyncHTTP2Client(object):
         key = (host, port,)
         if key in self.pools:
             pool = self.pools[key]
-            IOLoop.current().add_callback(pool.close)
+            IOLoop.current().add_callback(partial(pool.close, force=False))
 
         self.pools[key] = H2ConnectionPool(
             host, port, ssl_options, max_connections, connect_timeout
