@@ -126,7 +126,11 @@ class H2Stream(object):
                 self.stream_id, data_chunk, end_stream=end_stream
             )
             future = self.send_outstanding_data_cb()
-            future.add_done_callback(partial(self._send_data, to_send))
+            # Have the callback yield to the IOLoop, so that we can process
+            # events in the case the stream dies
+            future.add_done_callback(partial(
+                IOLoop.current().add_callback,
+                    partial(self._send_data, to_send)))
         else:
             self.local_closed = True
 
