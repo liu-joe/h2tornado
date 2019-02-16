@@ -4,7 +4,6 @@ from tornado import stack_context, httputil
 from tornado.concurrent import Future
 from tornado.httpclient import HTTPRequest, HTTPResponse, HTTPError
 from tornado.ioloop import IOLoop
-from tornado.gen import coroutine
 from functools import partial
 from urlparse import urlparse
 
@@ -120,50 +119,3 @@ class HTTP2Client(object):
 
         self._closed = True
         self._client.close()
-
-
-if __name__ == '__main__':
-    print HTTP2Client().fetch(
-        HTTPRequest(
-            'https://localhost:5000/',
-            connect_timeout=5,
-            request_timeout=5,
-            client_key="key.pem",
-            client_cert="cert.pem"))
-    import time
-    from tornado.gen import sleep
-
-    def print_it(start, res):
-        print res.result(), time.time() - start
-
-    conn = AsyncHTTP2Client()
-
-    @coroutine
-    def doit():
-        while True:
-            for i in xrange(10):
-                IOLoop.current().add_callback(make_h2_conn)
-            yield sleep(3)
-
-    @coroutine
-    def wait_for_connected(connected=None):
-        print connected
-        if not connected or not connected.result():
-            yield sleep(1)
-            conn.is_connected().add_done_callback(wait_for_connected)
-        else:
-            make_h2_conn()
-
-    def make_h2_conn():
-        start = time.time()
-        result = conn.fetch(
-            HTTPRequest(
-                'https://localhost:5000/',
-                connect_timeout=5,
-                request_timeout=5,
-                client_key="key.pem",
-                client_cert="cert.pem"))
-        result.add_done_callback(partial(print_it, start))
-
-    IOLoop.current().add_callback(doit)
-    IOLoop.current().start()
