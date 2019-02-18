@@ -315,6 +315,7 @@ class H2Connection(object):
                             cancelled),
                         callback=read_until_cancelled)
 
+            self._closed = False
             read_until_cancelled()
             self.flush()
         except Exception as e:
