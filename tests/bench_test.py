@@ -92,7 +92,7 @@ if __name__ == '__main__':
         h2tornado_bench_time = run_h2tornado_benchmark(num_requests, 0)
         print "h2tornado: Did %s requests in %s seconds, %ss/op" % (num_requests, h2tornado_bench_time,float(h2tornado_bench_time) / num_requests)
         #assert h2tornado_bench_time < hyper_bench_time
-        print "h2tornado is %0.2f percent faster" % (((best_hyper_bench_time - h2tornado_bench_time) * 100) / best_hyper_bench_time)
+        print "h2tornado is %0.2f percent faster" % (100 * (best_hyper_bench_time / h2tornado_bench_time - 1))
         print "====================================================="
         print ""
     num_requests = 5000
@@ -105,7 +105,7 @@ if __name__ == '__main__':
     h2tornado_bench_time = run_h2tornado_benchmark(num_requests, 0)
     print "h2tornado: Did %s requests in %s seconds, %ss/op" % (num_requests, h2tornado_bench_time,float(h2tornado_bench_time) / num_requests)
     #assert h2tornado_bench_time < hyper_bench_time
-    print "h2tornado is %0.2f percent faster" % (((best_hyper_bench_time - h2tornado_bench_time) * 100) / best_hyper_bench_time)
+    print "h2tornado is %0.2f percent faster" % (100 * (best_hyper_bench_time / h2tornado_bench_time - 1))
     print "====================================================="
 
 
