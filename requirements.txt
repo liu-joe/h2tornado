@@ -1,3 +1,3 @@
 tornado>=4.5
-h2>=3
+-e git://github.com/kahuang/hyper-h2.git#egg=h2
 hyper>=0.7
