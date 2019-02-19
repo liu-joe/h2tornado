@@ -374,7 +374,6 @@ class H2Connection(object):
                         logger.info("Received unhandled event %s", event)
                 except Exception:
                     logger.exception("Error while handling event %s", event)
-            self.flush()
         except h2.exceptions.StreamClosedError:
             logger.info("Got stream closed on connection, reconnecting...")
             cancelled.cancel()
