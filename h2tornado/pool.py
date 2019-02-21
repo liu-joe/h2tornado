@@ -19,11 +19,13 @@ class H2ConnectionPool(object):
             self,
             host,
             port,
+            io_loop,
             ssl_options,
             max_connections=5,
             connect_timeout=5):
         self.host = host
         self.port = port
+        self.io_loop = io_loop
         self.ssl_options = ssl_options
         self.connect_timeout = connect_timeout
 
@@ -44,7 +46,7 @@ class H2ConnectionPool(object):
         no_more_available_streams = [
             c for c in self.h2_connections if not c.has_available_streams]
         for done_conn in no_more_available_streams:
-            IOLoop.current().add_callback(done_conn.graceful_close)
+            self.io_loop.add_callback(done_conn.graceful_close)
             self.h2_connections.remove(done_conn)
 
         ready_conns = [c for c in self.h2_connections if c.ready]
@@ -62,7 +64,7 @@ class H2ConnectionPool(object):
         # we're under self.max_connections connections
         if len(connecting_conns) <= 0:
             if len(self.h2_connections) < self.max_connections:
-                h2conn = H2Connection(self.host, self.port, self.ssl_options)
+                h2conn = H2Connection(self.host, self.port, self.io_loop, self.ssl_options)
                 connect_future = h2conn.connect()
                 # When this connection is connected again, process the queue
                 connect_future.add_done_callback(self._process_queue)
@@ -80,7 +82,7 @@ class H2ConnectionPool(object):
                 error=HTTPError(
                     599,
                     "Timed out in queue"),
-                request_time=IOLoop.current().time() -
+                request_time=self.io_loop.time() -
                 request.start_time))
         del self.waiters[key]
 
@@ -89,7 +91,7 @@ class H2ConnectionPool(object):
         key = object()
         self.queue.append((key, request, future))
         if not self.get_or_create_connection():
-            timeout_handle = IOLoop.current().add_timeout(IOLoop.current().time() +
+            timeout_handle = self.io_loop.add_timeout(self.io_loop.time() +
                                                           min(request.connect_timeout, request.request_timeout),
                                                           partial(self._on_timeout, key))
         else:
@@ -102,7 +104,7 @@ class H2ConnectionPool(object):
         if key in self.waiters:
             handle, request, future = self.waiters[key]
             if handle is not None:
-                IOLoop.current().remove_timeout(handle)
+                self.io_loop.remove_timeout(handle)
             del self.waiters[key]
 
     def _process_queue(self, *args):
@@ -119,7 +121,7 @@ class H2ConnectionPool(object):
                         req_future.set_exception(f.exception())
                     else:
                         req_future.set_result(f.result())
-                    IOLoop.current().add_callback(self._process_queue)
+                    self.io_loop.add_callback(self._process_queue)
 
                 done_future = connection.request(request)
                 done_future.add_done_callback(
@@ -130,4 +132,4 @@ class H2ConnectionPool(object):
             if force:
                 conn.close("Close called", reconnect=False)
             else:
-                IOLoop.current().add_callback(conn.graceful_close)
+                self.io_loop.add_callback(conn.graceful_close)

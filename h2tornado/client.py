@@ -13,7 +13,8 @@ logger = logging.getLogger('h2tornado')
 
 
 class AsyncHTTP2Client(object):
-    def __init__(self, default_max_connections=5):
+    def __init__(self, io_loop=None, default_max_connections=5):
+        self.io_loop = io_loop if io_loop else IOLoop.current()
         self.default_max_connections = default_max_connections
         self.pools = {}
         self._closed = False
@@ -25,7 +26,7 @@ class AsyncHTTP2Client(object):
         key = (host, port,)
         if key in self.pools:
             pool = self.pools[key]
-            IOLoop.current().add_callback(partial(pool.close, force=False))
+            self.io_loop.add_callback(partial(pool.close, force=False))
 
         self.pools[key] = H2ConnectionPool(
             host, port, ssl_options, max_connections, connect_timeout
@@ -55,7 +56,7 @@ class AsyncHTTP2Client(object):
                         request_time=time.time() - request.start_time)
                 else:
                     response = future.result()
-                IOLoop.current().add_callback(partial(callback, response))
+                self.io_loop.add_callback(partial(callback, response))
             future.add_done_callback(handle_future)
 
         def handle_response(f):
@@ -83,7 +84,8 @@ class AsyncHTTP2Client(object):
                     'client_cert': request.client_cert,
                 }
             self.pools[key] = H2ConnectionPool(
-                host, port, ssl_options, max_connections=self.default_max_connections)
+                host, port, self.io_loop, ssl_options,
+                max_connections=self.default_max_connections)
 
         pool = self.pools[key]
         pool.request(request).add_done_callback(handle_response)
@@ -100,7 +102,7 @@ class AsyncHTTP2Client(object):
 
         self._closed = True
         for _, pool in self.pools.iteritems():
-            IOLoop.current().add_callback(
+            self.io_loop.add_callback(
                 partial(pool.close, force=force)
             )
 
@@ -111,7 +113,7 @@ class HTTP2Client(object):
         self._closed = False
 
     def fetch(self, *args, **kwargs):
-        return IOLoop.current().run_sync(partial(self._client.fetch, *args, **kwargs))
+        return self.io_loop.run_sync(partial(self._client.fetch, *args, **kwargs))
 
     def close(self):
         if self._closed:

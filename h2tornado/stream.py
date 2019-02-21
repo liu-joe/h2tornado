@@ -23,9 +23,10 @@ logger = logging.getLogger('h2tornado.stream')
 
 
 class H2Stream(object):
-    def __init__(self, request, stream_id, h2conn, callback_response,
+    def __init__(self, request, stream_id, io_loop, h2conn, callback_response,
                  send_outstanding_data_cb, close_cb):
         self.stream_id = stream_id
+        self.io_loop = io_loop
         self.h2conn = h2conn
         self.callback_response = callback_response
         self.send_outstanding_data_cb = send_outstanding_data_cb
@@ -48,8 +49,8 @@ class H2Stream(object):
         timeout = self.request.request_timeout
         if not timeout:
             timeout = 30
-        self._timeout_handle = IOLoop.current().add_timeout(
-            IOLoop.current().time() + timeout,
+        self._timeout_handle = self.io_loop.add_timeout(
+            self.io_loop.time() + timeout,
             self._on_timeout
         )
         parsed = urlsplit(to_unicode(self.request.url))
@@ -129,7 +130,7 @@ class H2Stream(object):
             # Have the callback yield to the IOLoop, so that we can process
             # events in the case the stream dies
             future.add_done_callback(partial(
-                IOLoop.current().add_callback,
+                self.io_loop.add_callback,
                     partial(self._send_data, to_send)))
         else:
             self.local_closed = True
@@ -165,7 +166,7 @@ class H2Stream(object):
                 event)
 
     def _on_timeout(self):
-        IOLoop.current().remove_timeout(self._timeout_handle)
+        self.io_loop.remove_timeout(self._timeout_handle)
         self._timeout_handle = None
         # Let the other end know we're cancelling this stream
         try:
@@ -181,7 +182,7 @@ class H2Stream(object):
 
         self._finished = True
         if self._timeout_handle:
-            IOLoop.current().remove_timeout(self._timeout_handle)
+            self.io_loop.remove_timeout(self._timeout_handle)
             self._timeout_handle = None
 
         headers = {}
@@ -207,7 +208,7 @@ class H2Stream(object):
             reason=reason,
             headers=httputil.HTTPHeaders(headers),
             buffer=data,
-            request_time=IOLoop.current().time() - self.request.start_time,
+            request_time=self.io_loop.time() - self.request.start_time,
             effective_url=self.request.url
         )
         response.request.response = response

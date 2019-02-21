@@ -26,9 +26,10 @@ logger = logging.getLogger('h2tornado.connection')
 
 class H2Connection(object):
 
-    def __init__(self, host, port, ssl_options):
+    def __init__(self, host, port, io_loop, ssl_options):
         self.host = host
         self.port = port
+        self.io_loop = io_loop
 
         self.tcp_client = TCPClient()
 
@@ -95,7 +96,7 @@ class H2Connection(object):
 
         stream_id = self.h2conn.get_next_available_stream_id()
         self._streams[stream_id] = H2Stream(
-            request, stream_id, self.h2conn, callback,
+            request, stream_id, self.io_loop, self.h2conn, callback,
             self.flush, self._close_stream_callback
         )
         self._streams[stream_id].start()
@@ -138,8 +139,8 @@ class H2Connection(object):
         self._connect_future = Future()
         # Shared context to cleanly cancel inflight operations
         cancelled = CancelContext()
-        start_time = IOLoop.current().time()
-        self._connect_timeout_handle = IOLoop.current().add_timeout(
+        start_time = self.io_loop.time()
+        self._connect_timeout_handle = self.io_loop.add_timeout(
             start_time + self.connect_timeout, partial(self.on_connect_timeout, cancelled))
 
         def _on_tcp_client_connected(f):
@@ -161,8 +162,8 @@ class H2Connection(object):
         return self._connect_future
 
     def _backoff_reconnect(self):
-        IOLoop.current().add_timeout(
-            IOLoop.current().time() +
+        self.io_loop.add_timeout(
+            self.io_loop.time() +
             min(self.max_backoff_seconds, self.consecutive_connect_fails**1.5),
             self.connect)
 
@@ -218,7 +219,7 @@ class H2Connection(object):
         logger.debug('Closing HTTP2Connection with reason %s', reason)
 
         if self._connect_timeout_handle:
-            IOLoop.current().remove_timeout(self._connect_timeout_handle)
+            self.io_loop.remove_timeout(self._connect_timeout_handle)
             self._connect_timeout_handle = None
 
         if self.h2conn:
@@ -250,7 +251,7 @@ class H2Connection(object):
 
     def end_all_streams(self, exc=None):
         for _, stream in self._streams.iteritems():
-            IOLoop.current().add_callback(partial(stream.finish, exc))
+            self.io_loop.add_callback(partial(stream.finish, exc))
 
     def on_connect(self, cancelled, io_stream):
         try:
@@ -270,7 +271,7 @@ class H2Connection(object):
                     ALPN_PROTOCOLS)
 
             # remove the connection timeout
-            IOLoop.current().remove_timeout(self._connect_timeout_handle)
+            self.io_loop.remove_timeout(self._connect_timeout_handle)
             self._connect_timeout_handle = None
 
             self.io_stream = io_stream
