@@ -8,7 +8,7 @@ from tornado.httpclient import HTTPError, HTTPRequest, HTTPResponse
 from tornado.ioloop import IOLoop
 
 from h2tornado.config import DEFAULT_WINDOW_SIZE, MAX_CONNECT_BACKOFF, \
-                             MAX_CLOSE_BACKOFF
+    MAX_CLOSE_BACKOFF
 from h2tornado.pool import H2ConnectionPool
 
 logger = logging.getLogger('h2tornado')
@@ -27,7 +27,7 @@ class AsyncHTTP2Client(object):
                             max_connect_backoff=MAX_CONNECT_BACKOFF,
                             max_close_backoff=MAX_CLOSE_BACKOFF,):
         """Optional method to pre-add a connection pool with various options.
-        
+
         Otherwise connection pools will be added on-demand using the built-in
         defaults and information from the http request.
 
@@ -139,7 +139,7 @@ class AsyncHTTP2Client(object):
 
     def close(self, force=True):
         """Closes this client, releasing any resources used.
-        
+
         :param force: if force is True close will forcibly close all
             connections and inflight requests. Otherwise it will wait
             for inflight requests to finish before closing any connections.
@@ -168,4 +168,3 @@ class HTTP2Client(object):
 
         self._closed = True
         self._client.close()
-

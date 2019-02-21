@@ -10,6 +10,7 @@ import h2.events
 import h2.exceptions
 import h2.settings
 from hyper.http20.window import FlowControlManager
+from hyper.http20.errors import get_data as get_data_errors
 from tornado import stack_context
 from tornado.concurrent import Future
 from tornado.gen import coroutine
@@ -17,7 +18,7 @@ from tornado.ioloop import IOLoop
 from tornado.tcpclient import TCPClient
 
 from h2tornado.config import ALPN_PROTOCOLS, DEFAULT_WINDOW_SIZE, \
-                             MAX_CONNECT_BACKOFF, MAX_CLOSE_BACKOFF
+    MAX_CONNECT_BACKOFF, MAX_CLOSE_BACKOFF
 from h2tornado.exceptions import ConnectionError
 from h2tornado.stream import H2Stream
 from h2tornado.utils import CancelContext
@@ -28,9 +29,9 @@ logger = logging.getLogger('h2tornado.connection')
 class H2Connection(object):
 
     def __init__(self, host, port, io_loop, ssl_options,
-            max_connect_backoff=MAX_CONNECT_BACKOFF,
-            initial_window_size=DEFAULT_WINDOW_SIZE,
-            connect_timeout=5):
+                 max_connect_backoff=MAX_CONNECT_BACKOFF,
+                 initial_window_size=DEFAULT_WINDOW_SIZE,
+                 connect_timeout=5, connect_callback=None):
         self.host = host
         self.port = port
         self.io_loop = io_loop
@@ -53,6 +54,7 @@ class H2Connection(object):
         self.initial_window_size = initial_window_size
         self.max_connect_backoff = max_connect_backoff
         self.consecutive_connect_fails = 0
+        self.connect_callback = connect_callback
 
         self._closed = False
 
@@ -69,7 +71,7 @@ class H2Connection(object):
     @property
     def has_outbound_capacity(self):
         """Whether this connection has more outbound streams available.
-        
+
         This is negotiated via http2 settings updates with the remote.
         """
         if not self.h2conn:
@@ -82,7 +84,7 @@ class H2Connection(object):
     @property
     def has_available_streams(self):
         """Whether there are more client stream ids availablei.
-        
+
         See https://http2.github.io/http2-spec/#StreamIdentifiers for more
         infomation.
         """
@@ -90,7 +92,8 @@ class H2Connection(object):
             return True
 
         has_available_stream_ids = self.h2conn.highest_outbound_stream_id is None or \
-            self.h2conn.highest_outbound_stream_id + 2 <= self.h2conn.HIGHEST_ALLOWED_STREAM_ID
+            self.h2conn.highest_outbound_stream_id + \
+            2 <= self.h2conn.HIGHEST_ALLOWED_STREAM_ID
         return has_available_stream_ids
 
     @property
@@ -196,7 +199,7 @@ class H2Connection(object):
 
     def on_connect_timeout(self, cancelled):
         """Handle a connection timeout.
-        
+
         :param cancelled: A CancelContext to cancel inflight operations
         associated with this connection or connection attempt.
         """
@@ -259,7 +262,7 @@ class H2Connection(object):
 
     def close(self, reason, reconnect=True):
         """Closes the connection, sending a GOAWAY frame.
-        
+
         :param reason: why this connection was closed
         :param reconnect: whether to try to reconnect
         """
@@ -379,6 +382,7 @@ class H2Connection(object):
             self._connect_future.set_exception(e)
         else:
             self._connect_future.set_result(True)
+            self.io_loop.add_callback(self.connect_callback)
 
     def _adjust_window(self, frame_len):
         """Adjust the flow control window"""
@@ -389,7 +393,7 @@ class H2Connection(object):
 
     def receive_data_until_cancelled(self, cancelled, data):
         """Handle the received data over the wire.
-        
+
         :param cancelled: A CancelContext to cancel inflight operations
         associated with this connection or connection attempt.
         :param data: data received over the wire from the remote
@@ -443,9 +447,15 @@ class H2Connection(object):
             logger.info("Got stream closed on connection, reconnecting...")
             cancelled.cancel()
             self.close(ConnectionError("Stream closed by remote peer"))
+        except h2.exceptions.ProtocolError as e:
+            logger.exception(
+                "Exception while receiving data from %s, closing connection",
+                (self.host, self.port,))
+            self.close(ConnectionError(str(e)))
         except Exception:
             logger.exception(
-                "Exception while receiving data from %s", (self.host, self.port,))
+                "Unhandled exception while receiving data from %s",
+                (self.host, self.port,))
 
     def flush(self):
         """Send any outstanding data to the remote"""

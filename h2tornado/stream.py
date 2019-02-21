@@ -14,7 +14,6 @@ from hyper.http20.window import FlowControlManager
 from tornado import httputil
 from tornado.escape import to_unicode
 from tornado.httpclient import HTTPResponse
-from tornado.ioloop import IOLoop
 
 from h2tornado.config import DEFAULT_WINDOW_SIZE
 from h2tornado.exceptions import StreamResetException
@@ -124,7 +123,9 @@ class H2Stream(object):
             return
 
         if self.sent < self.total:
-            to_send = self.h2conn.local_flow_control_window(self.stream_id)
+            to_send = min(
+                self.h2conn.local_flow_control_window(self.stream_id),
+                self.h2conn.max_outbound_frame_size)
 
             end_stream = False
             if self.sent + to_send >= self.total:
@@ -139,7 +140,7 @@ class H2Stream(object):
             # events in the case the stream dies
             future.add_done_callback(partial(
                 self.io_loop.add_callback,
-                    partial(self._send_data, to_send)))
+                partial(self._send_data, to_send)))
         else:
             self.local_closed = True
 
@@ -188,7 +189,7 @@ class H2Stream(object):
 
     def finish(self, exc=None, timed_out=False):
         """Finish the request.
-        
+
         :param exc: exception encountered while processing this request, if any
         :param timed_out: whether this request timed out or not
         """
@@ -205,7 +206,7 @@ class H2Stream(object):
         # Stream reset
         if exc:
             code = 500
-            reason = exc.message if hasattr(exc,"message") else str(exc)
+            reason = exc.message if hasattr(exc, "message") else str(exc)
         elif not timed_out:
             data = io.BytesIO(b''.join(self.data))
             headers = {}

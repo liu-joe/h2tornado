@@ -1,0 +1,2 @@
+-r requirements.txt
+-e git://github.com/kahuang/tornado_http2.git#egg=tornado_http2

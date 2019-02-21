@@ -6,11 +6,10 @@ from functools import partial
 from tornado import stack_context
 from tornado.concurrent import Future
 from tornado.httpclient import HTTPError, HTTPResponse
-from tornado.ioloop import IOLoop
 
 from h2tornado.connection import H2Connection
 from h2tornado.config import DEFAULT_WINDOW_SIZE, MAX_CONNECT_BACKOFF, \
-                             MAX_CLOSE_BACKOFF
+    MAX_CLOSE_BACKOFF
 
 logger = logging.getLogger('h2tornado.pool')
 
@@ -80,10 +79,9 @@ class H2ConnectionPool(object):
                                       self.ssl_options,
                                       self.max_connect_backoff,
                                       self.initial_window_size,
-                                      self.connect_timeout)
-                connect_future = h2conn.connect()
-                # When this connection is connected again, process the queue
-                connect_future.add_done_callback(self._process_queue)
+                                      self.connect_timeout,
+                                      self._process_queue)
+                h2conn.connect()
                 self.h2_connections.append(h2conn)
 
         return None
@@ -91,7 +89,7 @@ class H2ConnectionPool(object):
     def _on_timeout(self, key):
         """Processes the timeout for the request that maps to key, returning
         an HTTP 599 client side timeout to the caller.
-        
+
         :param key: object() object that was created when the request was
             queued
         """
@@ -118,9 +116,10 @@ class H2ConnectionPool(object):
         key = object()
         self.queue.append((key, request, future))
         if not self.get_or_create_connection():
-            timeout_handle = self.io_loop.add_timeout(self.io_loop.time() +
-                                                          min(request.connect_timeout, request.request_timeout),
-                                                          partial(self._on_timeout, key))
+            timeout = min(request.connect_timeout or self.connect_timeout,
+                          request.request_timeout or self.connect_timeout)
+            timeout_handle = self.io_loop.add_timeout(self.io_loop.time() + timeout,
+                                                      partial(self._on_timeout, key))
         else:
             timeout_handle = None
         self.waiters[key] = (timeout_handle, request, future)
@@ -142,7 +141,7 @@ class H2ConnectionPool(object):
 
     def _process_queue(self, *args):
         """Processes currently queued requests.
-        
+
         If there are pending requests and there exists at least one connection
         that can serve the request, the request is sent using that connection.
 
@@ -180,4 +179,4 @@ class H2ConnectionPool(object):
                 conn.close("Close called", reconnect=False)
             else:
                 self.io_loop.add_callback(partial(conn.graceful_close,
-                    self.max_close_backoff))
+                                                  self.max_close_backoff))
