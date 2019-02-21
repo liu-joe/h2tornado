@@ -49,6 +49,10 @@ class H2ConnectionPool(object):
         self.h2_connections = []
 
     def get_or_create_connection(self):
+        """Gets a connection that is capable of sending a request, or else
+        creates one if there are no connections, or no connections with more
+        outbound capacity, subject to self.max_connections
+        """
         # Gracefully close any connections that have exhausted the number of streams
         # allowed for a single connection. Remove them from our pool
         no_more_available_streams = [
@@ -85,6 +89,12 @@ class H2ConnectionPool(object):
         return None
 
     def _on_timeout(self, key):
+        """Processes the timeout for the request that maps to key, returning
+        an HTTP 599 client side timeout to the caller.
+        
+        :param key: object() object that was created when the request was
+            queued
+        """
         timeout_handle, request, future = self.waiters[key]
         self.queue.remove((key, request, future,))
         future.set_result(
@@ -99,6 +109,11 @@ class H2ConnectionPool(object):
         del self.waiters[key]
 
     def request(self, request):
+        """Queues the request for processing and returns a Future that will
+        resolve with the HTTPResponse when the request is finished.
+
+        :param request: HTTPRequest that is being processed
+        """
         future = Future()
         key = object()
         self.queue.append((key, request, future))
@@ -113,6 +128,12 @@ class H2ConnectionPool(object):
         return future
 
     def _remove_timeout(self, key):
+        """Removes the pending timeout for the request that maps to key, if it
+        exists.
+
+        :param key: object() object that was created when the request was
+            queued
+        """
         if key in self.waiters:
             handle, request, future = self.waiters[key]
             if handle is not None:
@@ -120,6 +141,14 @@ class H2ConnectionPool(object):
             del self.waiters[key]
 
     def _process_queue(self, *args):
+        """Processes currently queued requests.
+        
+        If there are pending requests and there exists at least one connection
+        that can serve the request, the request is sent using that connection.
+
+        :param *args: unused, but since this function can be called with
+        a future from add_done_callback, this function must take parameters.
+        """
         with stack_context.NullContext():
             while self.queue and self.get_or_create_connection():
                 connection = self.get_or_create_connection()
@@ -140,6 +169,12 @@ class H2ConnectionPool(object):
                     partial(chain_futures, request_future))
 
     def close(self, force=False):
+        """Closes this connection pool, releasing any resources used.
+
+        :param force: if True close will forcibly close connections, killing any
+        inflight operations. Otherwise it will gracefully close connections,
+        waiting for inflight operations to complete.
+        """
         for conn in self.h2_connections:
             if force:
                 conn.close("Close called", reconnect=False)

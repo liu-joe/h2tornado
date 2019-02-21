@@ -102,7 +102,7 @@ if __name__ == '__main__':
     print "Testing %d requests with requests that take %d seconds" % (num_requests, sleep_time)
     best_hyper_bench_time = run_requests_hyper_benchmark(num_requests, poolsize, sleep_time)
     print "requests/hyper %d threads: Did %s requests in %s seconds, %ss/op" % (poolsize, num_requests, best_hyper_bench_time,float(best_hyper_bench_time) / num_requests)
-    h2tornado_bench_time = run_h2tornado_benchmark(num_requests, 0)
+    h2tornado_bench_time = run_h2tornado_benchmark(num_requests, sleep_time)
     print "h2tornado: Did %s requests in %s seconds, %ss/op" % (num_requests, h2tornado_bench_time,float(h2tornado_bench_time) / num_requests)
     #assert h2tornado_bench_time < hyper_bench_time
     print "h2tornado is %0.2f percent faster" % (100 * (best_hyper_bench_time / h2tornado_bench_time - 1))

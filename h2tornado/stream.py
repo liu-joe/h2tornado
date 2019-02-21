@@ -46,6 +46,7 @@ class H2Stream(object):
         self._timeout_handle = None
 
     def start(self):
+        """Send the http request to the remote"""
         timeout = self.request.request_timeout
         if not timeout:
             timeout = 30
@@ -103,6 +104,7 @@ class H2Stream(object):
             self.send_body()
 
     def send_body(self):
+        """Send the body of the http request"""
         self.total = len(self.request.body)
         self.sent = 0
 
@@ -110,6 +112,12 @@ class H2Stream(object):
             self._send_data()
 
     def _send_data(self, sent_bytes=0, *args):
+        """Send the data in chunks according to flow control
+
+        :param sent_bytes: how many bytes were sent on the last call
+        :param *args: this function can be called with a future from
+            add_done_callback.
+        """
         self.sent += sent_bytes
 
         if self._finished:
@@ -136,6 +144,7 @@ class H2Stream(object):
             self.local_closed = True
 
     def handle_event(self, event):
+        """Handle any http2 events"""
         if isinstance(event, h2.events.DataReceived):
             size = event.flow_controlled_length
             increment = self.flow_control_manager._handle_frame(size)
@@ -166,6 +175,7 @@ class H2Stream(object):
                 event)
 
     def _on_timeout(self):
+        """Handle a request timeout, sends RST to the remote for this stream"""
         self.io_loop.remove_timeout(self._timeout_handle)
         self._timeout_handle = None
         # Let the other end know we're cancelling this stream
@@ -177,6 +187,11 @@ class H2Stream(object):
         self.finish(exc=None, timed_out=True)
 
     def finish(self, exc=None, timed_out=False):
+        """Finish the request.
+        
+        :param exc: exception encountered while processing this request, if any
+        :param timed_out: whether this request timed out or not
+        """
         if self._finished:
             return
 

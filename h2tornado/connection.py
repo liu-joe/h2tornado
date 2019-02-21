@@ -58,14 +58,20 @@ class H2Connection(object):
 
     @property
     def drained(self):
+        """Whether this connection has any inflight streams"""
         return len(self._streams) <= 0
 
     @property
     def ready(self):
+        """Whether this connection is capable of serving more requests"""
         return self.is_connected and self.has_outbound_capacity
 
     @property
     def has_outbound_capacity(self):
+        """Whether this connection has more outbound streams available.
+        
+        This is negotiated via http2 settings updates with the remote.
+        """
         if not self.h2conn:
             return True
 
@@ -75,6 +81,11 @@ class H2Connection(object):
 
     @property
     def has_available_streams(self):
+        """Whether there are more client stream ids availablei.
+        
+        See https://http2.github.io/http2-spec/#StreamIdentifiers for more
+        infomation.
+        """
         if not self.h2conn:
             return True
 
@@ -84,11 +95,13 @@ class H2Connection(object):
 
     @property
     def is_connected(self):
+        """Whether this connection is connected to the remote, or not"""
         if self._connect_future.done():
             return self._connect_future.result() and self.h2conn
         return False
 
     def request(self, request):
+        """Make a new stream on this connection and sends the request"""
         future = Future()
 
         def callback(result):
@@ -106,9 +119,18 @@ class H2Connection(object):
         return future
 
     def _close_stream_callback(self, stream_id):
+        """Called by H2Stream objects to clean up their state after they are
+        finished.
+        """
         del self._streams[stream_id]
 
     def parse_ssl_opts(self):
+        """Parses the ssl_options passed into this connection.
+
+        If self.ssl_options is an ssl.SSLContext, it uses it. Otherwise it's
+        assumed to be a dictionary and an ssl.SSLContext is created according
+        to the options.
+        """
         if isinstance(self.ssl_options, ssl.SSLContext):
             self.ssl_context = ssl_options
             return
@@ -136,6 +158,7 @@ class H2Connection(object):
         self.ssl_context = ssl_context
 
     def connect(self):
+        """Connect to the remote"""
         if self._connect_timeout_handle:
             return
 
@@ -165,22 +188,29 @@ class H2Connection(object):
         return self._connect_future
 
     def _backoff_reconnect(self):
+        """Try to reconnect to the remote, backoff as appropriate"""
         self.io_loop.add_timeout(
             IOLoop.current().time() +
             min(self.max_connect_backoff, self.consecutive_connect_fails**1.5),
             self.connect)
 
     def on_connect_timeout(self, cancelled):
-        """ Connection timed out. """
+        """Handle a connection timeout.
+        
+        :param cancelled: A CancelContext to cancel inflight operations
+        associated with this connection or connection attempt.
+        """
         self.consecutive_connect_fails += 1
         cancelled.cancel()
         exc = ConnectionError('Connection could not be established in time!')
         self.close(exc)
 
     def on_error(self, phase, cancelled, typ, val, tb):
-        """
-        Connection error.
+        """An unrecoverable connection error happened, close the connection.
+
         :param phase: phase we encountered the error in
+        :param cancelled: A CancelContext to cancel inflight operations
+        associated with this connection or connection attempt.
         :param typ: type of error
         :param val: error
         :param tb: traceback information
@@ -189,6 +219,11 @@ class H2Connection(object):
         self.close(val)
 
     def on_close(self, cancelled):
+        """Handle the underlying iostream getting closed.
+
+        :param cancelled: A CancelContext to cancel inflight operations
+        associated with this connection or connection attempt.
+        """
         # Already closed, so no cleanup needed
         if cancelled():
             return
@@ -204,6 +239,12 @@ class H2Connection(object):
 
     @coroutine
     def graceful_close(self, max_backoff=MAX_CLOSE_BACKOFF):
+        """Gracefully close this connection by waiting for inflight operations
+        to finish.
+
+        :param max_backoff: maximum backoff time for polling this connection
+        for inflight operations and deciding to call close.
+        """
         i = 0
         while True:
             if self._closed:
@@ -217,7 +258,11 @@ class H2Connection(object):
             i += 1
 
     def close(self, reason, reconnect=True):
-        """ Closes the connection, sending a GOAWAY frame. """
+        """Closes the connection, sending a GOAWAY frame.
+        
+        :param reason: why this connection was closed
+        :param reconnect: whether to try to reconnect
+        """
         logger.debug('Closing HTTP2Connection with reason %s', reason)
 
         if self._connect_timeout_handle:
@@ -252,10 +297,20 @@ class H2Connection(object):
             self._closed = True
 
     def end_all_streams(self, exc=None):
+        """Ends all inflight streams with the given exception.
+
+        :param exc: exception for why we're ending all streams.
+        """
         for _, stream in self._streams.iteritems():
             self.io_loop.add_callback(partial(stream.finish, exc))
 
     def on_connect(self, cancelled, io_stream):
+        """Initiate this connections state after we're connected.
+
+        :param cancelled: A CancelContext to cancel inflight operations
+        associated with this connection or connection attempt.
+        :param io_stream: IOStream object that was successfully connected.
+        """
         try:
             if cancelled():
                 io_stream.close()
@@ -326,12 +381,19 @@ class H2Connection(object):
             self._connect_future.set_result(True)
 
     def _adjust_window(self, frame_len):
+        """Adjust the flow control window"""
         increment = self.window_manager._handle_frame(frame_len)
         if increment:
             self.h2conn.increment_flow_control_window(increment)
         self.flush()
 
     def receive_data_until_cancelled(self, cancelled, data):
+        """Handle the received data over the wire.
+        
+        :param cancelled: A CancelContext to cancel inflight operations
+        associated with this connection or connection attempt.
+        :param data: data received over the wire from the remote
+        """
         # If we got cancelled, that means the connection died and
         # we're making a new one. Don't process any events from the
         # (now) old connection
@@ -386,6 +448,7 @@ class H2Connection(object):
                 "Exception while receiving data from %s", (self.host, self.port,))
 
     def flush(self):
+        """Send any outstanding data to the remote"""
         future = Future()
         if self._closed:
             future.set_result(None)

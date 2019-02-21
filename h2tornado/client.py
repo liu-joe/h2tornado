@@ -21,13 +21,29 @@ class AsyncHTTP2Client(object):
         self.pools = {}
         self._closed = False
 
-    # Optional method to pre-add a connection pool, otherwise they will
-    # be created on demand using the information from the http request
     def add_connection_pool(self, host, port, ssl_options, max_connections=5,
                             connect_timeout=5,
                             initial_window_size=DEFAULT_WINDOW_SIZE,
                             max_connect_backoff=MAX_CONNECT_BACKOFF,
                             max_close_backoff=MAX_CLOSE_BACKOFF,):
+        """Optional method to pre-add a connection pool with various options.
+        
+        Otherwise connection pools will be added on-demand using the built-in
+        defaults and information from the http request.
+
+        :param host: Host to connect to
+        :param port: Port to connect to host on
+        :param ssl_options: ssl options to use for tls
+        :param max_connections: maximum number of http2 connections to create
+        :param initial_window_size: default http2 window size for the
+            connections and streams created
+        :param max_connect_backoff: maximum backoff time in seconds for
+            attempting to reconnect to this host when the connect attempt
+            fails
+        :param max_close_backoff: maximum backoff time in seconds for
+            attempting to gracefully close this connection pool when there
+            are still inflight requests
+        """
         key = (host, port,)
         if key in self.pools:
             pool = self.pools[key]
@@ -39,6 +55,25 @@ class AsyncHTTP2Client(object):
         )
 
     def fetch(self, request, callback=None, raise_error=True, **kwargs):
+        """Executes a request, asynchronously returning an `HTTPResponse`.
+
+        The request may be either a string URL or an `HTTPRequest` object.
+        If it is a string, we construct an `HTTPRequest` using any additional
+        kwargs: ``HTTPRequest(request, **kwargs)``
+
+        This method returns a `.Future` whose result is an
+        `HTTPResponse`. By default, the ``Future`` will raise an
+        `HTTPError` if the request returned a non-200 response code
+        (other errors may also be raised if the server could not be
+        contacted). Instead, if ``raise_error`` is set to False, the
+        response will always be returned regardless of the response
+        code.
+
+        If a ``callback`` is given, it will be invoked with the `HTTPResponse`.
+        In the callback interface, `HTTPError` is not automatically raised.
+        Instead, you must check the response's ``error`` attribute or
+        call its `~HTTPResponse.rethrow` method.
+        """
         if self._closed:
             raise RuntimeError("fetch() called on a closed AsyncHTTP2Client")
         if not isinstance(request, HTTPRequest):
@@ -90,7 +125,7 @@ class AsyncHTTP2Client(object):
                     'client_cert': request.client_cert,
                 }
             self.pools[key] = H2ConnectionPool(
-                host, port, ssl_options,
+                host, port, self.io_loop, ssl_options,
                 max_connections=self.default_max_connections)
 
         pool = self.pools[key]
@@ -103,6 +138,12 @@ class AsyncHTTP2Client(object):
         return (host, port,)
 
     def close(self, force=True):
+        """Closes this client, releasing any resources used.
+        
+        :param force: if force is True close will forcibly close all
+            connections and inflight requests. Otherwise it will wait
+            for inflight requests to finish before closing any connections.
+        """
         if self._closed:
             return
 
