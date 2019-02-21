@@ -9,6 +9,8 @@ from tornado.httpclient import HTTPError, HTTPResponse
 from tornado.ioloop import IOLoop
 
 from h2tornado.connection import H2Connection
+from h2tornado.config import DEFAULT_WINDOW_SIZE, MAX_CONNECT_BACKOFF, \
+                             MAX_CLOSE_BACKOFF
 
 logger = logging.getLogger('h2tornado.pool')
 
@@ -22,12 +24,18 @@ class H2ConnectionPool(object):
             io_loop,
             ssl_options,
             max_connections=5,
-            connect_timeout=5):
+            connect_timeout=5,
+            initial_window_size=DEFAULT_WINDOW_SIZE,
+            max_connect_backoff=MAX_CONNECT_BACKOFF,
+            max_close_backoff=MAX_CLOSE_BACKOFF,):
         self.host = host
         self.port = port
         self.io_loop = io_loop
         self.ssl_options = ssl_options
         self.connect_timeout = connect_timeout
+        self.initial_window_size = initial_window_size
+        self.max_connect_backoff = max_connect_backoff
+        self.max_close_backoff = max_close_backoff
 
         # Maximum number of http2 connections to open (in the case of
         # us queueing requests due to maxing out the number of outbound
@@ -64,7 +72,11 @@ class H2ConnectionPool(object):
         # we're under self.max_connections connections
         if len(connecting_conns) <= 0:
             if len(self.h2_connections) < self.max_connections:
-                h2conn = H2Connection(self.host, self.port, self.io_loop, self.ssl_options)
+                h2conn = H2Connection(self.host, self.port, self.io_loop,
+                                      self.ssl_options,
+                                      self.max_connect_backoff,
+                                      self.initial_window_size,
+                                      self.connect_timeout)
                 connect_future = h2conn.connect()
                 # When this connection is connected again, process the queue
                 connect_future.add_done_callback(self._process_queue)
@@ -132,4 +144,5 @@ class H2ConnectionPool(object):
             if force:
                 conn.close("Close called", reconnect=False)
             else:
-                self.io_loop.add_callback(conn.graceful_close)
+                self.io_loop.add_callback(partial(conn.graceful_close,
+                    self.max_close_backoff))

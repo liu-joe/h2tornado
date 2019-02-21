@@ -16,7 +16,8 @@ from tornado.gen import coroutine
 from tornado.ioloop import IOLoop
 from tornado.tcpclient import TCPClient
 
-from h2tornado.config import ALPN_PROTOCOLS, DEFAULT_WINDOW_SIZE
+from h2tornado.config import ALPN_PROTOCOLS, DEFAULT_WINDOW_SIZE, \
+                             MAX_CONNECT_BACKOFF, MAX_CLOSE_BACKOFF
 from h2tornado.exceptions import ConnectionError
 from h2tornado.stream import H2Stream
 from h2tornado.utils import CancelContext
@@ -26,7 +27,10 @@ logger = logging.getLogger('h2tornado.connection')
 
 class H2Connection(object):
 
-    def __init__(self, host, port, io_loop, ssl_options):
+    def __init__(self, host, port, io_loop, ssl_options,
+            max_connect_backoff=MAX_CONNECT_BACKOFF,
+            initial_window_size=DEFAULT_WINDOW_SIZE,
+            connect_timeout=5):
         self.host = host
         self.port = port
         self.io_loop = io_loop
@@ -36,7 +40,7 @@ class H2Connection(object):
         self.h2conn = None
         self.io_stream = None
         self.window_manager = None
-        self.connect_timeout = 5
+        self.connect_timeout = connect_timeout
         self._connect_timeout_handle = None
         self._connect_future = None
 
@@ -46,10 +50,9 @@ class H2Connection(object):
 
         self.parse_ssl_opts()
 
-        self.initial_window_size = DEFAULT_WINDOW_SIZE
-        self.max_backoff_seconds = 60
+        self.initial_window_size = initial_window_size
+        self.max_connect_backoff = max_connect_backoff
         self.consecutive_connect_fails = 0
-        self.max_concurrent_streams = 1
 
         self._closed = False
 
@@ -163,8 +166,8 @@ class H2Connection(object):
 
     def _backoff_reconnect(self):
         self.io_loop.add_timeout(
-            self.io_loop.time() +
-            min(self.max_backoff_seconds, self.consecutive_connect_fails**1.5),
+            IOLoop.current().time() +
+            min(self.max_connect_backoff, self.consecutive_connect_fails**1.5),
             self.connect)
 
     def on_connect_timeout(self, cancelled):
@@ -200,8 +203,7 @@ class H2Connection(object):
         self.close(err)
 
     @coroutine
-    def graceful_close(self):
-        max_backoff = 30
+    def graceful_close(self, max_backoff=MAX_CLOSE_BACKOFF):
         i = 0
         while True:
             if self._closed:

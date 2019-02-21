@@ -7,6 +7,8 @@ from tornado.concurrent import Future
 from tornado.httpclient import HTTPError, HTTPRequest, HTTPResponse
 from tornado.ioloop import IOLoop
 
+from h2tornado.config import DEFAULT_WINDOW_SIZE, MAX_CONNECT_BACKOFF, \
+                             MAX_CLOSE_BACKOFF
 from h2tornado.pool import H2ConnectionPool
 
 logger = logging.getLogger('h2tornado')
@@ -22,14 +24,18 @@ class AsyncHTTP2Client(object):
     # Optional method to pre-add a connection pool, otherwise they will
     # be created on demand using the information from the http request
     def add_connection_pool(self, host, port, ssl_options, max_connections=5,
-                            connect_timeout=5):
+                            connect_timeout=5,
+                            initial_window_size=DEFAULT_WINDOW_SIZE,
+                            max_connect_backoff=MAX_CONNECT_BACKOFF,
+                            max_close_backoff=MAX_CLOSE_BACKOFF,):
         key = (host, port,)
         if key in self.pools:
             pool = self.pools[key]
             self.io_loop.add_callback(partial(pool.close, force=False))
 
         self.pools[key] = H2ConnectionPool(
-            host, port, ssl_options, max_connections, connect_timeout
+            host, port, ssl_options, max_connections, connect_timeout,
+            initial_window_size, max_connect_backoff, max_close_backoff,
         )
 
     def fetch(self, request, callback=None, raise_error=True, **kwargs):
@@ -84,7 +90,7 @@ class AsyncHTTP2Client(object):
                     'client_cert': request.client_cert,
                 }
             self.pools[key] = H2ConnectionPool(
-                host, port, self.io_loop, ssl_options,
+                host, port, ssl_options,
                 max_connections=self.default_max_connections)
 
         pool = self.pools[key]
