@@ -83,7 +83,7 @@ class H2Connection(object):
 
     @property
     def has_available_streams(self):
-        """Whether there are more client stream ids availablei.
+        """Whether there are more client stream ids available.
 
         See https://http2.github.io/http2-spec/#StreamIdentifiers for more
         infomation.
