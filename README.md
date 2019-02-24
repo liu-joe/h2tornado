@@ -41,60 +41,60 @@ There is a benchmark file `tests/bench_test.py` that is meant to be run with [th
 
 ```
 Testing 1 fast requests...
-requests/hyper 1 threads: Did 1 requests in 0.0222859382629 seconds, 0.0222859382629s/op
-requests/hyper 10 threads: Did 1 requests in 0.0109169483185 seconds, 0.0109169483185s/op
-requests/hyper 25 threads: Did 1 requests in 0.00705504417419 seconds, 0.00705504417419s/op
-requests/hyper 50 threads: Did 1 requests in 0.00883889198303 seconds, 0.00883889198303s/op
-requests/hyper 100 threads: Did 1 requests in 0.0120551586151 seconds, 0.0120551586151s/op
-h2tornado: Did 1 requests in 0.0179319381714 seconds, 0.0179319381714s/op
-h2tornado is -60.66 percent faster
+requests/hyper 1 threads: Did 1 requests in 0.0203619003296 seconds, 0.0203619003296s/op
+requests/hyper 10 threads: Did 1 requests in 0.00990700721741 seconds, 0.00990700721741s/op
+requests/hyper 25 threads: Did 1 requests in 0.00504803657532 seconds, 0.00504803657532s/op
+requests/hyper 50 threads: Did 1 requests in 0.00499510765076 seconds, 0.00499510765076s/op
+requests/hyper 100 threads: Did 1 requests in 0.00523900985718 seconds, 0.00523900985718s/op
+h2tornado: Did 1 requests in 0.00545597076416 seconds, 0.00545597076416s/op
+h2tornado is -8.45 percent faster
 =====================================================
 
 Testing 10 fast requests...
-requests/hyper 1 threads: Did 10 requests in 0.0221049785614 seconds, 0.00221049785614s/op
-requests/hyper 10 threads: Did 10 requests in 0.0253479480743 seconds, 0.00253479480743s/op
-requests/hyper 25 threads: Did 10 requests in 0.0207359790802 seconds, 0.00207359790802s/op
-requests/hyper 50 threads: Did 10 requests in 0.0433709621429 seconds, 0.00433709621429s/op
-requests/hyper 100 threads: Did 10 requests in 0.0251770019531 seconds, 0.00251770019531s/op
-h2tornado: Did 10 requests in 0.0261948108673 seconds, 0.00261948108673s/op
-h2tornado is -20.84 percent faster
+requests/hyper 1 threads: Did 10 requests in 0.0164549350739 seconds, 0.00164549350739s/op
+requests/hyper 10 threads: Did 10 requests in 0.0255649089813 seconds, 0.00255649089813s/op
+requests/hyper 25 threads: Did 10 requests in 0.0279428958893 seconds, 0.00279428958893s/op
+requests/hyper 50 threads: Did 10 requests in 0.021938085556 seconds, 0.0021938085556s/op
+requests/hyper 100 threads: Did 10 requests in 0.0242218971252 seconds, 0.00242218971252s/op
+h2tornado: Did 10 requests in 0.00916481018066 seconds, 0.000916481018066s/op
+h2tornado is 79.54 percent faster
 =====================================================
 
 Testing 100 fast requests...
-requests/hyper 1 threads: Did 100 requests in 0.168220043182 seconds, 0.00168220043182s/op
-requests/hyper 10 threads: Did 100 requests in 0.183554172516 seconds, 0.00183554172516s/op
-requests/hyper 25 threads: Did 100 requests in 0.178300857544 seconds, 0.00178300857544s/op
-requests/hyper 50 threads: Did 100 requests in 0.16913485527 seconds, 0.0016913485527s/op
-requests/hyper 100 threads: Did 100 requests in 0.164309978485 seconds, 0.00164309978485s/op
-h2tornado: Did 100 requests in 0.128261089325 seconds, 0.00128261089325s/op
-h2tornado is 28.11 percent faster
+requests/hyper 1 threads: Did 100 requests in 0.136910915375 seconds, 0.00136910915375s/op
+requests/hyper 10 threads: Did 100 requests in 0.127348899841 seconds, 0.00127348899841s/op
+requests/hyper 25 threads: Did 100 requests in 0.13174200058 seconds, 0.0013174200058s/op
+requests/hyper 50 threads: Did 100 requests in 0.136562108994 seconds, 0.00136562108994s/op
+requests/hyper 100 threads: Did 100 requests in 0.137073993683 seconds, 0.00137073993683s/op
+h2tornado: Did 100 requests in 0.0640780925751 seconds, 0.000640780925751s/op
+h2tornado is 98.74 percent faster
 =====================================================
 
 Testing 1000 fast requests...
-requests/hyper 1 threads: Did 1000 requests in 1.42091488838 seconds, 0.00142091488838s/op
-requests/hyper 10 threads: Did 1000 requests in 1.36811995506 seconds, 0.00136811995506s/op
-requests/hyper 25 threads: Did 1000 requests in 1.35694313049 seconds, 0.00135694313049s/op
-requests/hyper 50 threads: Did 1000 requests in 1.35142612457 seconds, 0.00135142612457s/op
-requests/hyper 100 threads: Did 1000 requests in 1.38814592361 seconds, 0.00138814592361s/op
-h2tornado: Did 1000 requests in 1.01176095009 seconds, 0.00101176095009s/op
-h2tornado is 33.57 percent faster
+requests/hyper 1 threads: Did 1000 requests in 1.25718712807 seconds, 0.00125718712807s/op
+requests/hyper 10 threads: Did 1000 requests in 1.23970794678 seconds, 0.00123970794678s/op
+requests/hyper 25 threads: Did 1000 requests in 1.22800397873 seconds, 0.00122800397873s/op
+requests/hyper 50 threads: Did 1000 requests in 1.19560909271 seconds, 0.00119560909271s/op
+requests/hyper 100 threads: Did 1000 requests in 1.22677111626 seconds, 0.00122677111626s/op
+h2tornado: Did 1000 requests in 0.653217077255 seconds, 0.000653217077255s/op
+h2tornado is 83.03 percent faster
 =====================================================
 
 Testing 5000 fast requests...
-requests/hyper 1 threads: Did 5000 requests in 7.00716900826 seconds, 0.00140143380165s/op
-requests/hyper 10 threads: Did 5000 requests in 6.7548160553 seconds, 0.00135096321106s/op
-requests/hyper 25 threads: Did 5000 requests in 6.92324304581 seconds, 0.00138464860916s/op
-requests/hyper 50 threads: Did 5000 requests in 6.9481139183 seconds, 0.00138962278366s/op
-requests/hyper 100 threads: Did 5000 requests in 6.91572380066 seconds, 0.00138314476013s/op
-h2tornado: Did 5000 requests in 5.06973981857 seconds, 0.00101394796371s/op
-h2tornado is 33.24 percent faster
+requests/hyper 1 threads: Did 5000 requests in 6.34008383751 seconds, 0.0012680167675s/op
+requests/hyper 10 threads: Did 5000 requests in 6.05900192261 seconds, 0.00121180038452s/op
+requests/hyper 25 threads: Did 5000 requests in 6.08251714706 seconds, 0.00121650342941s/op
+requests/hyper 50 threads: Did 5000 requests in 6.03093504906 seconds, 0.00120618700981s/op
+requests/hyper 100 threads: Did 5000 requests in 6.09232807159 seconds, 0.00121846561432s/op
+h2tornado: Did 5000 requests in 3.34326696396 seconds, 0.000668653392792s/op
+h2tornado is 80.39 percent faster
 =====================================================
 
 Testing 5000 requests with requests that take 1 seconds
-requests/hyper 250 threads: Did 5000 requests in 25.8569068909 seconds, 0.00517138137817s/op
-h2tornado: Did 5000 requests in 5.48314499855 seconds, 0.00109662899971s/op
-h2tornado is 371.57 percent faster
+requests/hyper 250 threads: Did 5000 requests in 23.5788249969 seconds, 0.00471576499939s/op
+h2tornado: Did 5000 requests in 4.87788796425 seconds, 0.00097557759285s/op
+h2tornado is 383.38 percent faster
 =====================================================
 ```
 
-For applications that need high concurrency, h2tornado outperforms a requests with hyper threadpool design by ~33% for 5000 concurrent requests. In addition, when 1 second of latency was injected into the request, h2tornado significantly outperforms requests/hyper. For applications that face downstreams with variable latency, h2tornado offers much higher throughput. In addition, requests/hyper does not provide support for opening multiple connections automatically, while h2tornado will open multiple connections to ensure maximum throughput.
+For applications that need high concurrency, h2tornado outperforms a requests with hyper threadpool design by ~80% for 5000 concurrent requests. In addition, when 1 second of latency was injected into the request, h2tornado significantly outperforms requests/hyper. For applications that face downstreams with variable latency, h2tornado offers much higher throughput. In addition, requests/hyper does not provide support for opening multiple connections automatically, while h2tornado will open multiple connections to ensure maximum throughput.
