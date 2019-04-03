@@ -8,7 +8,7 @@ with open('requirements.txt') as f:
     install_requires = f.read().strip().split("\n")
 
 config = {
-    'description': 'Tornado-based QProxy Client',
+    'description': 'Tornado-based HTTP/2 Client',
 
     'url': 'https://github.com/ContextLogic/h2tornado',
     'author': 'Andrew Huang',
