@@ -155,8 +155,10 @@ class AsyncHTTP2Client(object):
 
 
 class HTTP2Client(object):
-    def __init__(self, *args, **kwargs):
-        self._client = AsyncHTTP2Client(*args, **kwargs)
+    def __init__(self, io_loop=None, **kwargs):
+        self.io_loop = io_loop if io_loop else IOLoop.current()
+        kwargs['io_loop'] = self.io_loop
+        self._client = AsyncHTTP2Client(**kwargs)
         self._closed = False
 
     def fetch(self, *args, **kwargs):
