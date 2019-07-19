@@ -1,0 +1,21 @@
+image: ubuntu:latest
+  
+upload_egg:
+  script:
+    # add git as part of the egg upload
+    - apt-get update -y && apt-get install -y git
+    # Check if the package is actually installable
+    - apt-get install -y python curl
+    - apt-get install -y python-dev libffi-dev
+    - curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
+    - python get-pip.py
+    - pip install pyOpenSSL ndg-httpsclient pyasn1
+    - pip install .
+    - pip show $CI_PROJECT_NAME
+
+    # Upload to pypicloud
+    - pip install twine
+    - python setup.py sdist
+    - twine upload --repository-url $PYPI_SERVER --username $USERNAME --password $PASSWORD dist/*
+  only:
+    - master
