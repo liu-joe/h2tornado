@@ -18,7 +18,7 @@ config = {
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 2.7',
     ],
-    'version': '0.0.1',
+    'version': '0.0.2',
     'packages': ['h2tornado'],
     'scripts': [],
     'name': 'h2tornado',
