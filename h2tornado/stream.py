@@ -10,7 +10,7 @@ import h2.errors
 import h2.events
 import h2.exceptions
 import h2.settings
-from hyper.http20.window import FlowControlManager
+from window import FlowControlManager
 from tornado import httputil
 from tornado.escape import to_unicode
 from tornado.httpclient import HTTPResponse

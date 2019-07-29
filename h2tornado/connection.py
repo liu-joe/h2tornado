@@ -9,8 +9,8 @@ import h2.errors
 import h2.events
 import h2.exceptions
 import h2.settings
-from hyper.http20.window import FlowControlManager
-from hyper.http20.errors import get_data as get_data_errors
+from window import FlowControlManager
+from errors import get_data as get_data_errors
 from tornado import stack_context
 from tornado.concurrent import Future
 from tornado.gen import coroutine

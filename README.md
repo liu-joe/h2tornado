@@ -2,7 +2,7 @@ h2tornado
 =============
 
 This package contains an HTTP/2 client implementation for
-[Tornado](http://www.tornadoweb.org) using [hyper-h2](https://github.com/python-hyper/hyper-h2) and some utilities from [python-hyper](https://github.com/Lukasa/hyper).
+[Tornado](http://www.tornadoweb.org) using [hyper-h2](https://github.com/python-hyper/hyper-h2) and two utility files cherry-picked from [python-hyper](https://github.com/Lukasa/hyper) in [http20/window.py](https://github.com/python-hyper/hyper/blob/development/hyper/http20/window.py) and [http20/errors.py](https://github.com/python-hyper/hyper/blob/development/hyper/http20/errors.py) to avoid dependency conflicts which would arise from trying to install hyper as a requirement.
 
 Installation
 ------------
